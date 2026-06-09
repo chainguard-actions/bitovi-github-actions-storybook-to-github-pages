@@ -10,6 +10,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 |---------|-----|-----------------|
 | v1.0.0 | [`v1.0.0`](https://github.com/chainguard-actions/bitovi-github-actions-storybook-to-github-pages/tree/v1.0.0) | [`c7d2a47`](https://github.com/bitovi/github-actions-storybook-to-github-pages/commit/c7d2a479f2ec3d87d1131357f328e0e40c60da20) |
 | v1.0.2 | [`v1.0.2`](https://github.com/chainguard-actions/bitovi-github-actions-storybook-to-github-pages/tree/v1.0.2) | [`917d353`](https://github.com/bitovi/github-actions-storybook-to-github-pages/commit/917d353da534476f02e7f69168551a08631a693c) |
+| v1.0.3 | [`v1.0.3`](https://github.com/chainguard-actions/bitovi-github-actions-storybook-to-github-pages/tree/v1.0.3) | [`b75ece8`](https://github.com/bitovi/github-actions-storybook-to-github-pages/commit/b75ece8f984a32b2adb322065d7a8a2cc8db2d52) |
 | v1.0.4 | [`v1.0.4`](https://github.com/chainguard-actions/bitovi-github-actions-storybook-to-github-pages/tree/v1.0.4) | [`ddd9d35`](https://github.com/bitovi/github-actions-storybook-to-github-pages/commit/ddd9d35f670cceedd2bfc444be681001b0709730) |
 
 ## Privacy

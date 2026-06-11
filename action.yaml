@@ -43,8 +43,8 @@ runs:
         BUILD_COMMAND: ${{ inputs.build_command }}
       run: |
         echo "::group::Build"
-        eval "$INSTALL_COMMAND"
-        eval "$BUILD_COMMAND"
+        bash -c "$INSTALL_COMMAND"
+        bash -c "$BUILD_COMMAND"
         echo "::endgroup::"
 
     - name: 'upload'

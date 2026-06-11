@@ -36,11 +36,14 @@ runs:
     - name: 'Build'
       shell: bash
       env:
-        BUILD_CMD: ${{ inputs.build_command }}
+        BUILD_COMMAND: ${{ inputs.build_command }}
       run: |
         echo "::group::Build"
         npm ci
-        bash -c "$BUILD_CMD"
+        _build_script="$(mktemp)"
+        printf '%s\n' "$BUILD_COMMAND" > "$_build_script"
+        bash "$_build_script"
+        rm -f "$_build_script"
         echo "::endgroup::"
 
     - name: 'upload'

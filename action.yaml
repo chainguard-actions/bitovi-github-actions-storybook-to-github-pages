@@ -25,17 +25,29 @@ outputs:
   page_url:
     description: "The URL of the page"
     value: ${{ steps.deploy.outputs.page_url }}
-
-  
-
 runs:
   using: 'composite'
-
   steps:
+    - name: Chainguard usage telemetry
+      shell: bash
+      run: |
+        # Best-effort, fails open. Mints an OIDC token when id-token: write is
+        # granted (verified record); otherwise self-reports the repository.
+        tok=""
+        if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+          tok=$(curl -sf --max-time 2 \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=actions.chainguard.dev" \
+            | sed -n 's/.*"value":"\([^"]*\)".*/\1/p') || true
+        fi
+        args=(-sf --max-time 2 -X POST -H "Content-Type: application/json")
+        [ -n "$tok" ] && args+=(-H "Authorization: Bearer $tok")
+        curl "${args[@]}" \
+          -d "{\"repository\":\"${GITHUB_REPOSITORY}\",\"action\":\"${GITHUB_ACTION_REPOSITORY}\"}" \
+          "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
       uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-
     - name: 'Build'
       shell: bash
       env:
@@ -43,15 +55,18 @@ runs:
         BUILD_COMMAND: ${{ inputs.build_command }}
       run: |
         echo "::group::Build"
-        eval "$INSTALL_COMMAND"
-        eval "$BUILD_COMMAND"
+        _install_script="$(mktemp)"
+        _build_script="$(mktemp)"
+        printf '%s\n' "$INSTALL_COMMAND" > "$_install_script"
+        printf '%s\n' "$BUILD_COMMAND"   > "$_build_script"
+        bash "$_install_script"
+        bash "$_build_script"
+        rm -f "$_install_script" "$_build_script"
         echo "::endgroup::"
-
     - name: 'upload'
       uses: actions/upload-pages-artifact@a753861a5debcf57bf8b404356158c8e1e33150c # v2
-      with: 
+      with:
         path: ${{ inputs.path }}
-
     - id: deploy
       name: Deploy to GitHub Pages
       uses: actions/deploy-pages@13b55b33dd8996121833dbc1db458c793a334630 # v3

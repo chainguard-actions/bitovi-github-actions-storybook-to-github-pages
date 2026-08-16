@@ -1,0 +1,52 @@
+name: Test basic storybook deploy
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # GitHub Pages deployment requires these permissions
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Create a marker file to verify install and build commands ran
+      - name: Prepare workspace
+        run: |
+          mkdir -p /tmp/storybook-test
+          echo "not-run" > /tmp/storybook-test/install.txt
+          echo "not-run" > /tmp/storybook-test/build.txt
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          path: 'dist/storybook'
+          install_command: 'echo "install-ran" > /tmp/storybook-test/install.txt && mkdir -p dist/storybook && echo "storybook" > dist/storybook/index.html'
+          build_command: 'echo "build-ran" > /tmp/storybook-test/build.txt'
+        continue-on-error: true
+
+      - name: Assert install command ran
+        run: |
+          INSTALL_RESULT=$(cat /tmp/storybook-test/install.txt 2>/dev/null || echo "not-run")
+          echo "install result: $INSTALL_RESULT"
+          if [ "$INSTALL_RESULT" != "install-ran" ]; then
+            echo "FAIL: install command did not run as expected, got: $INSTALL_RESULT"
+            exit 1
+          fi
+          echo "PASS: install command ran"
+
+      - name: Assert build command ran
+        run: |
+          BUILD_RESULT=$(cat /tmp/storybook-test/build.txt 2>/dev/null || echo "not-run")
+          echo "build result: $BUILD_RESULT"
+          if [ "$BUILD_RESULT" != "build-ran" ]; then
+            echo "FAIL: build command did not run as expected, got: $BUILD_RESULT"
+            exit 1
+          fi
+          echo "PASS: build command ran"

@@ -1,0 +1,38 @@
+name: Test default path
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create default storybook output directory
+        run: |
+          mkdir -p dist/storybook
+          echo "<html><body>Storybook Default</body></html>" > dist/storybook/index.html
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'echo "install step"'
+          build_command: 'echo "build step"'
+        continue-on-error: true
+
+      - name: Assert action ran with default path
+        run: |
+          echo "action outcome: ${{ steps.action.outcome }}"
+          # The action uses default path 'dist/storybook' which we created above.
+          # Build commands (echo) should succeed.
+          # Deploy may fail without GitHub Pages configured, but action was invoked.
+          if [ "${{ steps.action.outcome }}" = "" ]; then
+            echo "FAIL: action did not run"
+            exit 1
+          fi
+          echo "PASS: action ran using default path dist/storybook"

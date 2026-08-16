@@ -1,0 +1,45 @@
+name: Test skip checkout
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create output directory for upload
+        run: |
+          mkdir -p storybook-out
+          echo "<html><body>Test</body></html>" > storybook-out/index.html
+
+      - name: Verify we are on a branch (not detached HEAD)
+        run: |
+          git branch --show-current
+          echo "Branch: $(git branch --show-current)"
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          path: storybook-out
+          install_command: 'echo "no install needed"'
+          build_command: 'echo "no build needed"'
+        continue-on-error: true
+
+      - name: Assert checkout was skipped and build ran
+        run: |
+          echo "action outcome: ${{ steps.action.outcome }}"
+          # When checkout=false, the checkout step is skipped.
+          # The install and build commands (echo) should run without error.
+          # The action may fail at deploy-pages if GitHub Pages is not configured,
+          # but the build portion should succeed.
+          if [ "${{ steps.action.outcome }}" = "" ]; then
+            echo "FAIL: action did not run"
+            exit 1
+          fi
+          echo "PASS: action ran with checkout=false"

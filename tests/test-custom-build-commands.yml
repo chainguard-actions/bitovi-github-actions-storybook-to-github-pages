@@ -1,0 +1,48 @@
+name: Test custom build commands
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create fake storybook output directory
+        run: mkdir -p dist/storybook && echo "<html><body>Storybook</body></html>" > dist/storybook/index.html
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          checkout: 'false'
+          install_command: 'echo "custom-install-ran" > /tmp/install-marker.txt'
+          build_command: 'echo "custom-build-ran" > /tmp/build-marker.txt'
+          path: 'dist/storybook'
+
+      - name: Assert custom install command ran
+        run: |
+          if [ ! -f /tmp/install-marker.txt ]; then
+            echo "FAIL: install marker not found — install_command did not run"
+            exit 1
+          fi
+          CONTENT=$(cat /tmp/install-marker.txt)
+          echo "install marker content: $CONTENT"
+          if [ "$CONTENT" != "custom-install-ran" ]; then
+            echo "FAIL: unexpected install marker content"
+            exit 1
+          fi
+          echo "PASS: custom install command ran"
+
+      - name: Assert custom build command ran
+        run: |
+          if [ ! -f /tmp/build-marker.txt ]; then
+            echo "FAIL: build marker not found — build_command did not run"
+            exit 1
+          fi
+          CONTENT=$(cat /tmp/build-marker.txt)
+          echo "build marker content: $CONTENT"
+          if [ "$CONTENT" != "custom-build-ran" ]; then
+            echo "FAIL: unexpected build marker content"
+            exit 1
+          fi
+          echo "PASS: custom build command ran"

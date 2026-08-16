@@ -1,0 +1,41 @@
+name: Test skip checkout input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Create fake storybook output directory
+      - name: Prepare fake storybook output
+        run: |
+          mkdir -p storybook-out
+          echo "<html><body>Storybook Output</body></html>" > storybook-out/index.html
+
+      - id: action
+        name: Run action with checkout disabled and custom path
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'echo "no install needed"'
+          build_command: 'echo "no build needed"'
+          path: 'storybook-out'
+        continue-on-error: true
+
+      - name: Assert action ran without checkout error
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          # The action should not fail due to checkout issues.
+          # It may fail at deploy-pages (no real Pages env in act), which is expected.
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action ran with checkout=false (outcome=$OUTCOME)"

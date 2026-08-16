@@ -1,0 +1,37 @@
+name: Test default path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-create default storybook output directory
+        run: |
+          mkdir -p dist/storybook
+          echo "<html><body>Default Path Test</body></html>" > dist/storybook/index.html
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          checkout: 'false'
+          install_command: 'echo "no-install"'
+          build_command: 'echo "default-path-build-ran" > /tmp/default-path-marker.txt'
+
+      - name: Assert build command ran with default path
+        run: |
+          if [ ! -f /tmp/default-path-marker.txt ]; then
+            echo "FAIL: build marker not found — build_command did not run"
+            exit 1
+          fi
+          echo "PASS: build command ran (default path dist/storybook used)"
+
+      - name: Assert default storybook output exists
+        run: |
+          if [ ! -f dist/storybook/index.html ]; then
+            echo "FAIL: dist/storybook/index.html not found"
+            exit 1
+          fi
+          echo "PASS: default path dist/storybook exists with content"

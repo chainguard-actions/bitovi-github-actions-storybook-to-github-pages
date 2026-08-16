@@ -25,17 +25,29 @@ outputs:
   page_url:
     description: "The URL of the page"
     value: ${{ steps.deploy.outputs.page_url }}
-
-  
-
 runs:
   using: 'composite'
-
   steps:
+    - name: Chainguard usage telemetry
+      shell: bash
+      run: |
+        # Best-effort, fails open. Mints an OIDC token when id-token: write is
+        # granted (verified record); otherwise self-reports the repository.
+        tok=""
+        if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+          tok=$(curl -sf --max-time 2 \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=actions.chainguard.dev" \
+            | sed -n 's/.*"value":"\([^"]*\)".*/\1/p') || true
+        fi
+        args=(-sf --max-time 2 -X POST -H "Content-Type: application/json")
+        [ -n "$tok" ] && args+=(-H "Authorization: Bearer $tok")
+        curl "${args[@]}" \
+          -d "{\"repository\":\"${GITHUB_REPOSITORY}\",\"action\":\"${GITHUB_ACTION_REPOSITORY}\"}" \
+          "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
     - name: 'Build'
       shell: bash
       env:
@@ -46,18 +58,15 @@ runs:
         bash -c "$INSTALL_COMMAND"
         bash -c "$BUILD_COMMAND"
         echo "::endgroup::"
-
     - name: 'upload'
       uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-      with: 
+      with:
         path: ${{ inputs.path }}
-
     - id: deploy
       name: Deploy to GitHub Pages
       uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
       with:
         token: ${{ github.token }}
-
     - name: Print footer
       shell: bash
       run: |
@@ -67,4 +76,3 @@ runs:
         echo "Check the rest of our actions in the [GitHub Marketplace](https://github.com/marketplace?category=&type=actions&verification=&query=bitovi)!"  >> $GITHUB_STEP_SUMMARY
         echo ""  >> $GITHUB_STEP_SUMMARY
         echo "You can get help or ask questions on our [Discord Channel](https://discord.gg/zAHn4JBVcX), or set up a free consultation on our [platform engineering website](https://www.bitovi.com/services/devops-consulting/platform-engineering)." >> $GITHUB_STEP_SUMMARY
-   

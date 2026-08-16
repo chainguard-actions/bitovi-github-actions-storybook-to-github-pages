@@ -1,0 +1,44 @@
+name: Test custom install and build commands
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Create a sentinel file to verify custom commands ran
+      - name: Prepare workspace
+        run: |
+          mkdir -p custom-dist
+          echo "<html><body>Custom Build</body></html>" > custom-dist/index.html
+
+      - id: action
+        name: Run action with custom install and build commands
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'touch /tmp/install-ran'
+          build_command: 'touch /tmp/build-ran'
+          path: 'custom-dist'
+        continue-on-error: true
+
+      - name: Assert custom install command ran
+        run: |
+          if [ ! -f /tmp/install-ran ]; then
+            echo "FAIL: install_command did not run (sentinel file missing)"
+            exit 1
+          fi
+          echo "PASS: install_command ran"
+
+      - name: Assert custom build command ran
+        run: |
+          if [ ! -f /tmp/build-ran ]; then
+            echo "FAIL: build_command did not run (sentinel file missing)"
+            exit 1
+          fi
+          echo "PASS: build_command ran"

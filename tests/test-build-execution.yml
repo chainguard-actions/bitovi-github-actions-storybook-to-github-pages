@@ -1,0 +1,49 @@
+name: Test build command execution
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Prepare marker file location
+        run: |
+          mkdir -p /tmp/test-markers
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'touch /tmp/test-markers/install-ran'
+          build_command: |
+            mkdir -p dist/storybook && echo "<html></html>" > dist/storybook/index.html && touch /tmp/test-markers/build-ran
+          path: 'dist/storybook'
+        continue-on-error: true
+
+      - name: Assert install command ran
+        run: |
+          if [ ! -f /tmp/test-markers/install-ran ]; then
+            echo "FAIL: install_command did not run (marker file not found)"
+            exit 1
+          fi
+          echo "PASS: install_command ran"
+
+      - name: Assert build command ran
+        run: |
+          if [ ! -f /tmp/test-markers/build-ran ]; then
+            echo "FAIL: build_command did not run (marker file not found)"
+            exit 1
+          fi
+          echo "PASS: build_command ran"
+
+      - name: Assert output directory was created by build
+        run: |
+          if [ ! -f dist/storybook/index.html ]; then
+            echo "FAIL: build output not found at dist/storybook/index.html"
+            exit 1
+          fi
+          echo "PASS: build output exists"

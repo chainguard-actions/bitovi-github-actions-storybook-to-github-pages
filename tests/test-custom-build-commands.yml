@@ -1,0 +1,63 @@
+name: Test custom build commands
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # GitHub Pages deploy requires these permissions
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Create a marker file before the action runs so we can verify
+      # the build commands actually execute
+      - name: Prepare workspace
+        run: |
+          echo "workspace ready" > /tmp/before-build.txt
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          # Use simple commands instead of npm to avoid needing node_modules
+          install_command: 'echo "install step ran" > /tmp/install-ran.txt'
+          build_command: |
+            echo "build step ran" > /tmp/build-ran.txt && mkdir -p dist/storybook && echo "<html><body>Storybook</body></html>" > dist/storybook/index.html
+          path: 'dist/storybook'
+        continue-on-error: true
+
+      - name: Assert install command ran
+        run: |
+          echo "Checking install marker..."
+          if [ ! -f /tmp/install-ran.txt ]; then
+            echo "FAIL: install command did not run (marker file missing)"
+            exit 1
+          fi
+          echo "Install marker content: $(cat /tmp/install-ran.txt)"
+          echo "PASS: install command ran"
+
+      - name: Assert build command ran
+        run: |
+          echo "Checking build marker..."
+          if [ ! -f /tmp/build-ran.txt ]; then
+            echo "FAIL: build command did not run (marker file missing)"
+            exit 1
+          fi
+          echo "Build marker content: $(cat /tmp/build-ran.txt)"
+          echo "PASS: build command ran"
+
+      - name: Assert build output directory was created
+        run: |
+          echo "Checking build output directory..."
+          if [ ! -d dist/storybook ]; then
+            echo "FAIL: build output directory 'dist/storybook' was not created"
+            exit 1
+          fi
+          if [ ! -f dist/storybook/index.html ]; then
+            echo "FAIL: expected index.html not found in dist/storybook"
+            exit 1
+          fi
+          echo "PASS: build output directory and files exist"

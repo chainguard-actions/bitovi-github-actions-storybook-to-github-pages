@@ -1,0 +1,47 @@
+name: Test skip checkout scenario
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Write a sentinel file that would be overwritten if checkout ran again
+      - name: Write sentinel file
+        run: |
+          echo "original-content" > /tmp/sentinel.txt
+          echo "Sentinel written: $(cat /tmp/sentinel.txt)"
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'echo "skipped install"'
+          build_command: |
+            mkdir -p dist/storybook && echo "<html><body>Skip checkout test</body></html>" > dist/storybook/index.html
+          path: 'dist/storybook'
+        continue-on-error: true
+
+      - name: Assert sentinel file still has original content
+        run: |
+          echo "Checking sentinel file..."
+          CONTENT="$(cat /tmp/sentinel.txt 2>/dev/null || echo '')"
+          echo "Sentinel content: $CONTENT"
+          if [ "$CONTENT" != "original-content" ]; then
+            echo "FAIL: sentinel file was modified (unexpected checkout may have occurred)"
+            exit 1
+          fi
+          echo "PASS: sentinel file intact, checkout was skipped as expected"
+
+      - name: Assert build output exists
+        run: |
+          if [ ! -d dist/storybook ]; then
+            echo "FAIL: build output directory not created"
+            exit 1
+          fi
+          echo "PASS: build output directory exists"

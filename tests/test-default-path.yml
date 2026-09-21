@@ -1,0 +1,44 @@
+name: Test default path and checkout behavior
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          # checkout: 'true' is the default — action will re-checkout the repo
+          checkout: 'true'
+          # Override install/build to avoid needing npm/node_modules
+          install_command: 'echo "install done"'
+          build_command: |
+            mkdir -p dist/storybook && echo "<html><body>Default path test</body></html>" > dist/storybook/index.html && echo "build done"
+          # path defaults to 'dist/storybook' — not overriding it here
+        continue-on-error: true
+
+      - name: Assert default output path exists
+        run: |
+          echo "Checking default output path dist/storybook..."
+          if [ ! -d dist/storybook ]; then
+            echo "FAIL: default output directory 'dist/storybook' was not created"
+            exit 1
+          fi
+          echo "Contents of dist/storybook:"
+          ls -la dist/storybook/
+          echo "PASS: default output path 'dist/storybook' exists"
+
+      - name: Assert index.html was created by build command
+        run: |
+          if [ ! -f dist/storybook/index.html ]; then
+            echo "FAIL: index.html not found in dist/storybook"
+            exit 1
+          fi
+          echo "index.html content: $(cat dist/storybook/index.html)"
+          echo "PASS: index.html exists in default output path"

@@ -47,7 +47,7 @@ runs:
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
-      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      uses: chainguard-actions/actions-checkout@59b7218bfc2eaabc464f1254f6e1dac5bda91d94 # v4
     - name: 'Build'
       shell: bash
       env:
@@ -59,12 +59,12 @@ runs:
         bash -c "$BUILD_COMMAND"
         echo "::endgroup::"
     - name: 'upload'
-      uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      uses: chainguard-actions/actions-upload-pages-artifact@e2c4c7670c215010f2d293cce333c0ec3e87f47a # v3
       with:
         path: ${{ inputs.path }}
     - id: deploy
       name: Deploy to GitHub Pages
-      uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      uses: chainguard-actions/actions-deploy-pages@f4d5c29b63bb3df1e6eac647993dd0c3fe33651c # v4
       with:
         token: ${{ github.token }}
     - name: Print footer

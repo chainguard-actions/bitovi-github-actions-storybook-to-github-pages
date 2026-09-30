@@ -47,7 +47,7 @@ runs:
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
-      uses: chainguard-actions/actions-checkout@59b7218bfc2eaabc464f1254f6e1dac5bda91d94 # v4
+      uses: chainguard-actions/actions-checkout@31bbccf724702f8a0dc7a3ed7db8fcca2066babc # v4
     - name: 'Build'
       shell: bash
       env:

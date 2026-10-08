@@ -55,8 +55,12 @@ runs:
         BUILD_COMMAND: ${{ inputs.build_command }}
       run: |
         echo "::group::Build"
-        bash -c "$INSTALL_COMMAND"
-        bash -c "$BUILD_COMMAND"
+        _script="$(mktemp)"
+        printf '%s\n' "$INSTALL_COMMAND" > "$_script"
+        bash -eo pipefail "$_script"
+        printf '%s\n' "$BUILD_COMMAND" > "$_script"
+        bash -eo pipefail "$_script"
+        rm -f "$_script"
         echo "::endgroup::"
     - name: 'upload'
       uses: chainguard-actions/actions-upload-pages-artifact@e2c4c7670c215010f2d293cce333c0ec3e87f47a # v3

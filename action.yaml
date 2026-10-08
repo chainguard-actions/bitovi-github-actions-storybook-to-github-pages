@@ -44,7 +44,7 @@ runs:
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
-      uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+      uses: chainguard-actions/actions-checkout@44c54598b257617371589c99ff0b52dab29a2bb4 # v3
     - name: 'Build'
       shell: bash
       env:
@@ -57,11 +57,11 @@ runs:
         bash -eo pipefail "$_build_script"
         echo "::endgroup::"
     - name: 'upload'
-      uses: actions/upload-pages-artifact@a597aecd27af1cf14095ccaa29169358e3d91e28 # v1.0.4
+      uses: chainguard-actions/actions-upload-pages-artifact@a324ededda5d9122121a8798c3be4d05e0866d74 # v1.0.4
       with:
         path: ${{ inputs.path }}
     - id: deploy
       name: Deploy to GitHub Pages
-      uses: actions/deploy-pages@f27bcc15848fdcdcc02f01754eb838e44bcf389b # v1
+      uses: chainguard-actions/actions-deploy-pages@af65fd33f7ab8761df515b864b0ad4345f03e7f2 # v1
       with:
         token: ${{ github.token }}

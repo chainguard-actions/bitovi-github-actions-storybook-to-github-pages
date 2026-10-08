@@ -1,0 +1,73 @@
+name: Test custom build command
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up fake package.json for npm ci
+        run: |
+          cat > package.json <<'EOF'
+          {
+            "name": "test-storybook",
+            "version": "1.0.0",
+            "scripts": {}
+          }
+          EOF
+          cat > package-lock.json <<'EOF'
+          {
+            "name": "test-storybook",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "requires": true,
+            "packages": {
+              "": {
+                "name": "test-storybook",
+                "version": "1.0.0"
+              }
+            }
+          }
+          EOF
+
+      - id: action
+        name: Run action with custom build command and path
+        uses: .
+        with:
+          checkout: 'false'
+          build_command: 'mkdir -p custom-output && echo "built" > custom-output/index.html'
+          path: 'custom-output'
+        continue-on-error: true
+
+      - name: Assert custom output directory was created
+        run: |
+          echo "Checking custom output directory..."
+          if [ ! -f "custom-output/index.html" ]; then
+            echo "FAIL: custom-output/index.html was not created"
+            exit 1
+          fi
+          CONTENT=$(cat custom-output/index.html)
+          echo "content: $CONTENT"
+          if [ "$CONTENT" != "built" ]; then
+            echo "FAIL: expected 'built' in index.html, got '$CONTENT'"
+            exit 1
+          fi
+          echo "PASS: custom build command ran and produced expected output"
+
+      - name: Assert action did not skip
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped"
+            exit 1
+          fi
+          echo "PASS"

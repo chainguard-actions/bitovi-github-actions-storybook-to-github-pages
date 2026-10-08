@@ -1,0 +1,74 @@
+name: Test skip checkout input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a sentinel file to verify checkout is not re-run
+        run: |
+          echo "sentinel" > sentinel.txt
+
+      - name: Set up package.json for npm ci
+        run: |
+          cat > package.json <<'EOF'
+          {
+            "name": "test-storybook",
+            "version": "1.0.0",
+            "scripts": {}
+          }
+          EOF
+          cat > package-lock.json <<'EOF'
+          {
+            "name": "test-storybook",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "requires": true,
+            "packages": {
+              "": {
+                "name": "test-storybook",
+                "version": "1.0.0"
+              }
+            }
+          }
+          EOF
+
+      - id: action
+        name: Run action with checkout disabled
+        uses: .
+        with:
+          checkout: 'false'
+          build_command: 'mkdir -p dist/storybook && echo "ok" > dist/storybook/index.html'
+          path: 'dist/storybook'
+        continue-on-error: true
+
+      - name: Assert sentinel file still exists (checkout was not re-run)
+        run: |
+          echo "Checking sentinel file..."
+          if [ ! -f "sentinel.txt" ]; then
+            echo "FAIL: sentinel.txt was removed, suggesting checkout was re-run"
+            exit 1
+          fi
+          CONTENT=$(cat sentinel.txt)
+          echo "sentinel content: $CONTENT"
+          if [ "$CONTENT" != "sentinel" ]; then
+            echo "FAIL: sentinel.txt content changed"
+            exit 1
+          fi
+          echo "PASS: sentinel file intact, checkout was skipped as expected"
+
+      - name: Assert build output exists
+        run: |
+          if [ ! -f "dist/storybook/index.html" ]; then
+            echo "FAIL: build output not found"
+            exit 1
+          fi
+          echo "PASS: build output exists"

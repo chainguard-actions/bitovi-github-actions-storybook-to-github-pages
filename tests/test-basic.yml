@@ -1,0 +1,72 @@
+name: Test basic usage - custom build command
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Grant pages permissions so deploy-pages step doesn't fail on auth
+    permissions:
+      pages: write
+      id-token: write
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up fake package.json and output dir
+        run: |
+          # Create a minimal package.json so npm ci succeeds (no deps)
+          cat > package.json <<'EOF'
+          {
+            "name": "test-storybook",
+            "version": "1.0.0",
+            "scripts": {
+              "build-storybook": "mkdir -p dist/storybook && echo '<html></html>' > dist/storybook/index.html"
+            }
+          }
+          EOF
+          # Create an empty package-lock.json so npm ci works
+          cat > package-lock.json <<'EOF'
+          {
+            "name": "test-storybook",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "requires": true,
+            "packages": {
+              "": {
+                "name": "test-storybook",
+                "version": "1.0.0"
+              }
+            }
+          }
+          EOF
+
+      - id: action
+        name: Run action
+        uses: .
+        with:
+          checkout: 'false'
+          build_command: 'npm run build-storybook'
+          path: 'dist/storybook'
+        continue-on-error: true
+
+      - name: Assert build output was created
+        run: |
+          echo "Checking that build output directory exists..."
+          if [ ! -f "dist/storybook/index.html" ]; then
+            echo "FAIL: dist/storybook/index.html was not created by build command"
+            exit 1
+          fi
+          echo "PASS: build output exists"
+
+      - name: Assert action ran (outcome is not skipped)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action ran (outcome=$OUTCOME)"

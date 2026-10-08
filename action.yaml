@@ -47,21 +47,19 @@ runs:
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
-      uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
     - name: 'Build'
       shell: bash
       env:
-        INSTALL_COMMAND: ${{ inputs.install_command }}
-        BUILD_COMMAND: ${{ inputs.build_command }}
+        INSTALL_CMD: ${{ inputs.install_command }}
+        BUILD_CMD: ${{ inputs.build_command }}
       run: |
         echo "::group::Build"
-        _install_script="$(mktemp)"
-        _build_script="$(mktemp)"
-        printf '%s\n' "$INSTALL_COMMAND" > "$_install_script"
-        printf '%s\n' "$BUILD_COMMAND"   > "$_build_script"
-        bash "$_install_script"
-        bash "$_build_script"
-        rm -f "$_install_script" "$_build_script"
+        _script=$(mktemp)
+        printf '%s\n' "$INSTALL_CMD" > "$_script"
+        printf '%s\n' "$BUILD_CMD" >> "$_script"
+        bash -eo pipefail "$_script"
+        rm -f "$_script"
         echo "::endgroup::"
     - name: 'upload'
       uses: actions/upload-pages-artifact@a753861a5debcf57bf8b404356158c8e1e33150c # v2

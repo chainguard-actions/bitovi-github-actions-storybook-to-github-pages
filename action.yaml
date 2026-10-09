@@ -55,18 +55,14 @@ runs:
         BUILD_COMMAND: ${{ inputs.build_command }}
       run: |
         echo "::group::Build"
-        install_cmd=()
-        if [ -n "$INSTALL_COMMAND" ]; then
-          while IFS= read -r -d '' t; do install_cmd+=("$t"); done \
-            < <(printf '%s' "$INSTALL_COMMAND" | xargs printf '%s\0')
-        fi
-        build_cmd=()
-        if [ -n "$BUILD_COMMAND" ]; then
-          while IFS= read -r -d '' t; do build_cmd+=("$t"); done \
-            < <(printf '%s' "$BUILD_COMMAND" | xargs printf '%s\0')
-        fi
-        "${install_cmd[@]}"
-        "${build_cmd[@]}"
+        _install_script=$(mktemp)
+        printf '%s\n' "$INSTALL_COMMAND" > "$_install_script"
+        bash -eo pipefail "$_install_script"
+        rm -f "$_install_script"
+        _build_script=$(mktemp)
+        printf '%s\n' "$BUILD_COMMAND" > "$_build_script"
+        bash -eo pipefail "$_build_script"
+        rm -f "$_build_script"
         echo "::endgroup::"
     - name: 'upload'
       uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b

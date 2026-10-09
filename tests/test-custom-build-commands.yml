@@ -1,0 +1,58 @@
+name: Test custom build commands
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # GitHub Pages permissions required by actions/deploy-pages
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a marker file to verify install command ran
+        run: |
+          # We'll use a temp dir to track command execution
+          mkdir -p /tmp/test-markers
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          # Use simple echo commands instead of npm to verify they run
+          install_command: 'echo "install ran" > /tmp/test-markers/install.txt'
+          build_command: 'mkdir -p dist/storybook && echo "build ran" > /tmp/test-markers/build.txt && echo "index" > dist/storybook/index.html'
+          path: 'dist/storybook'
+        continue-on-error: true
+
+      - name: Assert install command ran
+        run: |
+          if [ ! -f /tmp/test-markers/install.txt ]; then
+            echo "FAIL: install command did not run"
+            exit 1
+          fi
+          echo "PASS: install command ran"
+          cat /tmp/test-markers/install.txt
+
+      - name: Assert build command ran
+        run: |
+          if [ ! -f /tmp/test-markers/build.txt ]; then
+            echo "FAIL: build command did not run"
+            exit 1
+          fi
+          echo "PASS: build command ran"
+          cat /tmp/test-markers/build.txt
+
+      - name: Assert build output directory was created
+        run: |
+          if [ ! -d dist/storybook ]; then
+            echo "FAIL: dist/storybook directory was not created"
+            exit 1
+          fi
+          if [ ! -f dist/storybook/index.html ]; then
+            echo "FAIL: dist/storybook/index.html was not created"
+            exit 1
+          fi
+          echo "PASS: build output directory and files exist"

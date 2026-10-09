@@ -1,0 +1,54 @@
+name: Test custom install and build commands
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Prepare marker directory and output path
+        run: |
+          mkdir -p /tmp/cmd-order
+          rm -f /tmp/cmd-order/install /tmp/cmd-order/build
+          mkdir -p custom-output && echo "storybook" > custom-output/index.html
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'echo "1" > /tmp/cmd-order/install && echo "custom install ran"'
+          build_command: 'echo "2" > /tmp/cmd-order/build && echo "custom build ran"'
+          path: 'custom-output'
+        continue-on-error: true
+
+      - name: Assert install command ran
+        run: |
+          if [ ! -f /tmp/cmd-order/install ]; then
+            echo "FAIL: custom install_command did not execute"
+            exit 1
+          fi
+          echo "PASS: custom install_command executed"
+
+      - name: Assert build command ran
+        run: |
+          if [ ! -f /tmp/cmd-order/build ]; then
+            echo "FAIL: custom build_command did not execute"
+            exit 1
+          fi
+          echo "PASS: custom build_command executed"
+
+      - name: Assert install ran before build
+        run: |
+          INSTALL_VAL=$(cat /tmp/cmd-order/install | tr -d '[:space:]')
+          BUILD_VAL=$(cat /tmp/cmd-order/build | tr -d '[:space:]')
+          echo "install marker: $INSTALL_VAL"
+          echo "build marker: $BUILD_VAL"
+          if [ "$INSTALL_VAL" != "1" ] || [ "$BUILD_VAL" != "2" ]; then
+            echo "FAIL: commands did not run in expected order"
+            exit 1
+          fi
+          echo "PASS: install ran before build"

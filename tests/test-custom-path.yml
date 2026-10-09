@@ -1,0 +1,35 @@
+name: Test custom output path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'echo "install step"'
+          # Build into a custom path (not the default dist/storybook)
+          build_command: 'mkdir -p custom/output/path && echo "<html>custom path test</html>" > custom/output/path/index.html'
+          path: 'custom/output/path'
+        continue-on-error: true
+
+      - name: Assert custom output path was created by build command
+        run: |
+          if [ ! -d custom/output/path ]; then
+            echo "FAIL: custom/output/path directory was not created"
+            exit 1
+          fi
+          if [ ! -f custom/output/path/index.html ]; then
+            echo "FAIL: custom/output/path/index.html was not created"
+            exit 1
+          fi
+          echo "PASS: custom output path exists with expected content"
+          cat custom/output/path/index.html

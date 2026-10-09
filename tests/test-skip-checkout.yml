@@ -1,0 +1,46 @@
+name: Test skip checkout
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Record current HEAD sha before action runs
+        id: pre-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - id: action
+        uses: .
+        with:
+          checkout: 'false'
+          install_command: 'echo "skip-checkout-install done"'
+          build_command: 'mkdir -p dist/storybook && echo "<html>skip-checkout test</html>" > dist/storybook/index.html'
+          path: 'dist/storybook'
+        continue-on-error: true
+
+      - name: Assert HEAD sha unchanged (no re-checkout occurred)
+        run: |
+          PRE_SHA="${{ steps.pre-sha.outputs.sha }}"
+          CURRENT_SHA="$(git rev-parse HEAD)"
+          echo "pre-action sha: $PRE_SHA"
+          echo "current sha:    $CURRENT_SHA"
+          if [ "$PRE_SHA" != "$CURRENT_SHA" ]; then
+            echo "FAIL: HEAD sha changed, unexpected checkout may have occurred"
+            exit 1
+          fi
+          echo "PASS: HEAD sha unchanged, checkout was skipped as expected"
+
+      - name: Assert build output exists
+        run: |
+          if [ ! -f dist/storybook/index.html ]; then
+            echo "FAIL: expected build output not found"
+            exit 1
+          fi
+          echo "PASS: build output exists"
+          cat dist/storybook/index.html

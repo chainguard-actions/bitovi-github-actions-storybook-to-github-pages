@@ -62,7 +62,7 @@ runs:
         rm -f "$_script"
         echo "::endgroup::"
     - name: 'upload'
-      uses: chainguard-actions/actions-upload-pages-artifact@83cd48ca7635510622ddd9e2ac2e2b1658742085 # v2
+      uses: chainguard-actions/actions-upload-pages-artifact@9eef0ecb8688eceb03a601ca02f5e75d48179943 # v2
       with:
         path: ${{ inputs.path }}
     - id: deploy

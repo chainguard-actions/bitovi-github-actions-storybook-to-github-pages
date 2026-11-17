@@ -25,8 +25,10 @@ outputs:
   page_url:
     description: "The URL of the page"
     value: ${{ steps.deploy.outputs.page_url }}
+
 runs:
   using: 'composite'
+
   steps:
     - name: Chainguard usage telemetry
       shell: bash
@@ -48,6 +50,7 @@ runs:
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
       uses: chainguard-actions/actions-checkout@44c54598b257617371589c99ff0b52dab29a2bb4 # v3
+
     - name: 'Build'
       shell: bash
       env:
@@ -61,10 +64,12 @@ runs:
         bash -eo pipefail "$_script"
         rm -f "$_script"
         echo "::endgroup::"
+
     - name: 'upload'
       uses: chainguard-actions/actions-upload-pages-artifact@ed7494db7bb6d916e720b9a711750b5848469e57 # v2
       with:
         path: ${{ inputs.path }}
+
     - id: deploy
       name: Deploy to GitHub Pages
       uses: chainguard-actions/actions-deploy-pages@3a3fff9d742d32c5e6457166af4aa4e050bb6269 # v3

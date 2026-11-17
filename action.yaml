@@ -25,8 +25,12 @@ outputs:
   page_url:
     description: "The URL of the page"
     value: ${{ steps.deploy.outputs.page_url }}
+
+  
+
 runs:
   using: 'composite'
+
   steps:
     - name: Chainguard usage telemetry
       shell: bash
@@ -48,6 +52,7 @@ runs:
     - name: Checkout if required
       if: ${{ inputs.checkout == 'true' }}
       uses: chainguard-actions/actions-checkout@ce302dbf8a92e8d6afc796e6175361b867afbbca
+
     - name: 'Build'
       shell: bash
       env:
@@ -55,24 +60,23 @@ runs:
         BUILD_COMMAND: ${{ inputs.build_command }}
       run: |
         echo "::group::Build"
-        _install_script=$(mktemp)
-        printf '%s\n' "$INSTALL_COMMAND" > "$_install_script"
-        bash -eo pipefail "$_install_script"
-        rm -f "$_install_script"
         _build_script=$(mktemp)
-        printf '%s\n' "$BUILD_COMMAND" > "$_build_script"
+        printf '%s\n%s\n' "$INSTALL_COMMAND" "$BUILD_COMMAND" > "$_build_script"
         bash -eo pipefail "$_build_script"
         rm -f "$_build_script"
         echo "::endgroup::"
+
     - name: 'upload'
       uses: chainguard-actions/actions-upload-pages-artifact@8bde705aaa927efa5bda9732080465ba9f4c2d8b
-      with:
+      with: 
         path: ${{ inputs.path }}
+
     - id: deploy
       name: Deploy to GitHub Pages
       uses: chainguard-actions/actions-deploy-pages@f4d5c29b63bb3df1e6eac647993dd0c3fe33651c
       with:
         token: ${{ github.token }}
+
     - name: Print footer
       shell: bash
       run: |
@@ -82,3 +86,4 @@ runs:
         echo "Check the rest of our actions in the [GitHub Marketplace](https://github.com/marketplace?category=&type=actions&verification=&query=bitovi)!"  >> $GITHUB_STEP_SUMMARY
         echo ""  >> $GITHUB_STEP_SUMMARY
         echo "You can get help or ask questions on our [Discord Channel](https://discord.gg/zAHn4JBVcX), or set up a free consultation on our [platform engineering website](https://www.bitovi.com/services/devops-consulting/platform-engineering)." >> $GITHUB_STEP_SUMMARY
+   
